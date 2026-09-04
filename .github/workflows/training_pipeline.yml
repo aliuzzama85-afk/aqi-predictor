@@ -1,0 +1,36 @@
+# Runs the daily training pipeline: trains Ridge/RandomForest/TensorFlow models on
+# the aqi_features feature view and registers the best one to the Hopsworks Model
+# Registry (aqi_predictor/training_pipeline.py). Scheduled daily at 03:00 UTC, plus
+# a manual "Run workflow" button for on-demand runs.
+name: Training Pipeline
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  run-training-pipeline:
+    runs-on: ubuntu-latest
+    # Linux runner: the Windows-only workarounds in README's "Windows setup notes"
+    # (creating C:\tmp, the vendor/twofish-stub package) don't apply here - /tmp
+    # exists natively and pip can build twofish from source with the compiler
+    # ubuntu-latest already has. confluent-kafka and the HUDI time-travel format
+    # choice are unrelated to OS and are still required either way.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -e .
+
+      - name: Run training pipeline
+        run: python -m aqi_predictor.training_pipeline
+        env:
+          HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+          HOPSWORKS_PROJECT_NAME: ${{ secrets.HOPSWORKS_PROJECT_NAME }}
+          CITY_NAME: ${{ secrets.CITY_NAME }}
+          LATITUDE: ${{ secrets.LATITUDE }}
+          LONGITUDE: ${{ secrets.LONGITUDE }}

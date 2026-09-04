@@ -1,0 +1,35 @@
+# Runs the hourly feature pipeline: fetches the latest AQI/weather reading and
+# inserts it into the Hopsworks feature store (aqi_predictor/feature_pipeline.py).
+# Scheduled hourly, plus a manual "Run workflow" button for on-demand testing.
+name: Feature Pipeline
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+jobs:
+  run-feature-pipeline:
+    runs-on: ubuntu-latest
+    # Linux runner: the Windows-only workarounds in README's "Windows setup notes"
+    # (creating C:\tmp, the vendor/twofish-stub package) don't apply here - /tmp
+    # exists natively and pip can build twofish from source with the compiler
+    # ubuntu-latest already has. confluent-kafka and the HUDI time-travel format
+    # choice are unrelated to OS and are still required either way.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -e .
+
+      - name: Run feature pipeline
+        run: python -m aqi_predictor.feature_pipeline
+        env:
+          HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+          HOPSWORKS_PROJECT_NAME: ${{ secrets.HOPSWORKS_PROJECT_NAME }}
+          CITY_NAME: ${{ secrets.CITY_NAME }}
+          LATITUDE: ${{ secrets.LATITUDE }}
+          LONGITUDE: ${{ secrets.LONGITUDE }}
