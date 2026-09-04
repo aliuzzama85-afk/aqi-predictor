@@ -1,0 +1,9 @@
+[project]
+name = "twofish"
+version = "0.3.0"
+description = "Stub replacing the real twofish (unused by this project, needs a C compiler on Windows)"
+requires-python = ">=3.9"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
