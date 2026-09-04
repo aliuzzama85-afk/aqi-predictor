@@ -6,6 +6,16 @@ Forecasts AQI 3 days ahead.
 
 _TBD_
 
+## Model
+
+`aqi_predictor/training_pipeline.py` trains Ridge, RandomForest, and a small
+TensorFlow model to predict `european_aqi` 72h ahead, and registers the best
+(by RMSE) to the Hopsworks Model Registry as `aqi_forecast_model`. Current
+production model is **Ridge, RMSE 5.59** (MAE 4.06, R² 0.23) — R² is modest,
+which is expected from ~90 days of hourly data and no hyperparameter tuning.
+If there's time, the natural next steps are backfilling more historical data
+and further feature tuning, both of which should improve on this baseline.
+
 ## Windows setup notes
 
 `hopsworks` depends on `pyjks`, which depends on `twofish` — a package that only
