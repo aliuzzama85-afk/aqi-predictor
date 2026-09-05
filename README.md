@@ -56,7 +56,12 @@ so [Streamlit Community Cloud](https://share.streamlit.io) needs no code changes
 1. Push this repo to GitHub (already done).
 2. On share.streamlit.io, click "New app" and point it at this repo with
    `dashboard/app.py` as the main file path.
-3. In the app's Settings -> Secrets, paste the same five values from `.env`, in TOML format:
+3. Click "Advanced settings" **before** deploying and pick **Python 3.12** from the
+   "Python version" dropdown - this is the only way to pin it; Community Cloud has no
+   `runtime.txt`/`.python-version` file mechanism, and the version can't be changed on
+   an already-deployed app without deleting and redeploying it.
+4. In the same Advanced settings dialog, add Secrets - paste the same five values
+   from `.env`, in TOML format:
    ```toml
    HOPSWORKS_API_KEY = "..."
    HOPSWORKS_PROJECT_NAME = "..."
@@ -64,7 +69,7 @@ so [Streamlit Community Cloud](https://share.streamlit.io) needs no code changes
    LATITUDE = 24.8607
    LONGITUDE = 67.0011
    ```
-4. Deploy. Streamlit Cloud exposes these secrets as real environment variables, so
+5. Deploy. Streamlit Cloud exposes these secrets as real environment variables, so
    `config.py`'s `os.getenv(...)` calls pick them up exactly like `.env` does locally.
 
 ## Windows setup notes
