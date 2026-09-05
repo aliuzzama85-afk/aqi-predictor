@@ -4,7 +4,39 @@ Forecasts AQI 3 days ahead.
 
 ## Architecture
 
-_TBD_
+Two scheduled GitHub Actions jobs keep Hopsworks up to date; the dashboard only ever reads from it.
+
+```
+ GitHub Actions (hourly)             GitHub Actions (daily)
+ feature_pipeline.py                 training_pipeline.py
+ fetch latest AQI + weather,         train Ridge / RandomForest / TF,
+ engineer features, insert           register best model by RMSE
+         |                                    |
+         | insert                             | register
+         v                                    v
+ +----------------------------------------------------------+
+ |                         Hopsworks                         |
+ |   Feature Store (aqi_features)     Model Registry         |
+ |                                     (aqi_forecast_model)   |
+ +----------------------------------------------------------+
+                            |
+                            | read (aqi_predictor/inference.py)
+                            v
+                +--------------------------------+
+                |      Streamlit dashboard        |
+                |      dashboard/app.py           |
+                |  3-day forecast, SHAP, history   |
+                +--------------------------------+
+```
+
+- **Hourly** (`.github/workflows/feature_pipeline.yml`): fetches the latest AQI/weather
+  reading, builds features, and inserts one row into the `aqi_features` feature group
+  (idempotent - skips if that timestamp already exists).
+- **Daily** (`.github/workflows/training_pipeline.yml`): reads the full feature view,
+  trains Ridge/RandomForest/a small TF model, and registers whichever has the lowest
+  RMSE as `aqi_forecast_model`.
+- **Dashboard**: `aqi_predictor/inference.py` logs in once per load and reads the
+  latest features + production model straight from Hopsworks - no pipeline writes to it.
 
 ## Model
 
@@ -15,6 +47,25 @@ production model is **Ridge, RMSE 5.59** (MAE 4.06, R² 0.23) — R² is modest,
 which is expected from ~90 days of hourly data and no hyperparameter tuning.
 If there's time, the natural next steps are backfilling more historical data
 and further feature tuning, both of which should improve on this baseline.
+
+## Deployment
+
+The dashboard reads all its configuration from environment variables via `config.py`,
+so [Streamlit Community Cloud](https://share.streamlit.io) needs no code changes:
+
+1. Push this repo to GitHub (already done).
+2. On share.streamlit.io, click "New app" and point it at this repo with
+   `dashboard/app.py` as the main file path.
+3. In the app's Settings -> Secrets, paste the same five values from `.env`, in TOML format:
+   ```toml
+   HOPSWORKS_API_KEY = "..."
+   HOPSWORKS_PROJECT_NAME = "..."
+   CITY_NAME = "Karachi"
+   LATITUDE = 24.8607
+   LONGITUDE = 67.0011
+   ```
+4. Deploy. Streamlit Cloud exposes these secrets as real environment variables, so
+   `config.py`'s `os.getenv(...)` calls pick them up exactly like `.env` does locally.
 
 ## Windows setup notes
 
