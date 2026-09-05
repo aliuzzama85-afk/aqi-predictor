@@ -1,6 +1,12 @@
 # aqi-predictor
 
-Forecasts AQI 3 days ahead.
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://aqi-predictor-bzskyencn2jnwghb6m7dzu.streamlit.app/)
+
+**Live app: https://aqi-predictor-bzskyencn2jnwghb6m7dzu.streamlit.app/**
+
+Forecasts AQI 3 days ahead for Karachi, Pakistan. Two scheduled GitHub Actions
+pipelines keep a Hopsworks feature store and model registry current; a Streamlit
+dashboard reads from both to show the forecast, alerts, and SHAP explanations.
 
 ## Architecture
 
@@ -38,6 +44,50 @@ Two scheduled GitHub Actions jobs keep Hopsworks up to date; the dashboard only 
 - **Dashboard**: `aqi_predictor/inference.py` logs in once per load and reads the
   latest features + production model straight from Hopsworks - no pipeline writes to it.
 
+## Getting started (local)
+
+Needs **Python 3.12** (matches `pyproject.toml`, both GitHub Actions workflows, and
+the Streamlit Cloud deploy) and a Hopsworks account/project (the free tier works).
+
+1. Clone the repo and create a virtualenv:
+   ```
+   python -m venv .venv
+   ```
+   On Windows, read "Windows setup notes" below *before* the next step - `hopsworks`
+   pulls in a dependency that otherwise needs a C compiler to install.
+2. Install the package:
+   ```
+   .venv\Scripts\pip install -e .
+   ```
+   Run `.venv\Scripts\pip install -e ".[notebook]"` instead if you also want to
+   run `notebooks/eda.ipynb`.
+3. Copy `.env.example` to `.env` and fill in the required values - `config.py` raises
+   `EnvironmentError` on startup if any are missing:
+   ```
+   HOPSWORKS_API_KEY=...
+   HOPSWORKS_PROJECT_NAME=...
+   CITY_NAME=Karachi
+   LATITUDE=24.8607
+   LONGITUDE=67.0011
+   ```
+   (`.env.example` also lists `OPENWEATHER_API_KEY`, but nothing currently reads it -
+   all AQI/weather data comes from Open-Meteo, which needs no key.)
+4. One-time backfill - populates the Hopsworks feature group with ~90 days of history
+   (Windows: create `C:\tmp` first - see "Hopsworks backfill" under Windows setup notes):
+   ```
+   python -m aqi_predictor.backfill
+   ```
+5. Run either pipeline by hand (both also run automatically on the GitHub Actions
+   schedules described above):
+   ```
+   python -m aqi_predictor.feature_pipeline
+   python -m aqi_predictor.training_pipeline
+   ```
+6. Run the dashboard:
+   ```
+   streamlit run dashboard/app.py
+   ```
+
 ## Model
 
 `aqi_predictor/training_pipeline.py` trains Ridge, RandomForest, and a small
@@ -47,6 +97,10 @@ production model is **Ridge, RMSE 5.59** (MAE 4.06, R² 0.23) — R² is modest,
 which is expected from ~90 days of hourly data and no hyperparameter tuning.
 If there's time, the natural next steps are backfilling more historical data
 and further feature tuning, both of which should improve on this baseline.
+
+`notebooks/eda.ipynb` has exploratory analysis of the backfilled data (AQI over time,
+pollutant/weather correlations, hour-of-day and day-of-week patterns) - see "Getting
+started" above for the extra install it needs.
 
 ## Deployment
 
@@ -80,12 +134,10 @@ only used by `pyjks` for decrypting legacy BKS-format Java keystores, a path
 Hopsworks Serverless never exercises (its auth is REST/API-key based, not
 JKS-based). Rather than requiring MSVC Build Tools, this repo installs a stub
 `twofish` package from `vendor/twofish-stub/` that satisfies the dependency
-without compiling anything:
+without compiling anything. Run this between steps 1 and 2 of "Getting started" above:
 
 ```
-python -m venv .venv
 .venv\Scripts\pip install ./vendor/twofish-stub
-.venv\Scripts\pip install -e .
 ```
 
 If a future feature actually needs BKS-keystore support, `pip uninstall
